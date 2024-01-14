@@ -1,89 +1,181 @@
 <template>
-  <div class="background">
-    <div id="carouselExampleFade" class="carousel slide carousel-fade" data-ride="carousel">
-      <div class="carousel-inner">
-        <div class="carousel-item active">
-          <img class="d-block w-100" src='@/views/assets/images/mapa1_1943.jpg' alt="First slide">
-        </div>
-        <div class="carousel-item">
-          <img class="d-block w-100" src="@/views/assets/images/mapa2_1924.jpg" alt="Second slide">
-        </div>
-        <div class="carousel-item">
-          <img class="d-block w-100" src="@/views/assets/images/mapa3_1890.png" alt="Third slide">
-        </div>
-        <div class="carousel-item">
-          <img class="d-block w-100" src="@/views/assets/images/mapa5_1877.jpg" alt="Fourth slide">
-        </div>
-      </div>
-      <a class="carousel-control-prev" href="#carouselExampleFade" role="button" data-slide="prev">
-        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-        <span class="sr-only">Previous</span>
-      </a>
-      <a class="carousel-control-next" href="#carouselExampleFade" role="button" data-slide="next">
-        <span class="carousel-control-next-icon" aria-hidden="true"></span>
-        <span class="sr-only">Next</span>
-      </a>
-    </div>
-    <div class="logo" style="z-index: 1000;">
-      <img v-if="$t('home.title2')==='Como?'" src="@/views/assets/images/home_slider_pt_br.png">
-      <img v-else src="@/views/assets/images/home_slider_en.png">
-    </div>
-    <div class="text-style">
-      <div class="row justify-content-md-center">
-        <div class="col-sm-3 column-style">
-          <h5>{{ $t('home.title1') }}</h5>
-          <br>
-          <p>{{ $t('home.column1') }}</p>
-        </div>
-        <div class="col-sm-3 column-style">
-          <h5>{{ $t('home.title2') }}</h5>
-          <br>
-          <div v-html="$t('home.column2')"/>
-          <p>&nbsp;</p>
-        </div>
-        <div class="col-sm-3 column-style">
-          <h5>{{ $t('home.title3') }}</h5>
-          <br>
-          <p>{{ $t('home.column3') }}</p>
-        </div>
-      </div>
-      
-      <div class="row justify-content-md-center">
-        <div class="col-sm-9 column-style">
-          <how-to-cite/>
-        </div>
-      </div>
-    </div>
+  <p-dash-layout :title="$t('dashboard.home.dashboard')">
+    <div class="row">
 
-  </div>
+      <!-- notifications -->
+      <div class="col-sm-8">
+        <div class="card ">
+          <div class="card-body">
+            <h6 class="mb-0">{{ $t('dashboard.home.notifications') }}</h6>
+            <br>
+            <p-notifications showInput="true"></p-notifications>
+          </div>
+        </div>
+      </div>
+
+      <!-- layers lists -->
+      <div class="col-sm-4">
+
+        <!-- my layers list -->
+        <div class="card ">
+          <div class="card-body">
+            <h6 class="mb-0">{{ $t('dashboard.home.myLayers') }}</h6>
+            <br>
+            <div class="card-text">
+              <div class="row" v-for="layer in myLayers" v-bind:key="layer.layer_id">
+                <div class="col-sm-7">{{ layer.name }}</div>
+                <div class="col-sm-5">
+                  <button type="button" class="btn btn-outline-danger btn-sm add2" @click="deleteLayer(layer.layer_id)"><md-icon>clear</md-icon></button>
+                  <button type="button" class="btn btn-outline-dark btn-sm add" @click="editLayer(layer.layer_id)"><md-icon>create</md-icon></button>
+                </div>
+                <hr>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- shared layers list -->
+        <div class="card " style="margin-top: 20px">
+          <div class="card-body">
+            <h6 class="mb-0">{{ $t('dashboard.home.sharedLayers') }}</h6>
+            <br>
+            <div class="card-text">
+              <div class="row" v-for="layer in sharedLayers" v-bind:key="layer.layer_id">
+                <div class="col-sm-8">{{ layer.name }}</div>
+                <div class="col-sm-2">
+                  <button type="button" class="btn btn-outline-dark btn-sm add" @click="editLayer(layer.layer_id)"><md-icon>create</md-icon></button>
+                </div>
+                <div class="col-sm-2">
+                  <!--<button type="button" class="btn btn-outline-danger btn-sm add" @click="deleteLayer(layer.layer_id)"><md-icon>clear</md-icon></button>-->
+                </div>
+                <hr>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </p-dash-layout>
 </template>
 
 <script>
-import HowToCite from '@/views/components/HowToCite.vue'
+  import DashLayout from '@/views/layouts/dashboard'
+  import Api from '@/middleware/ApiVGI'
+  import { mapState } from 'vuex'
+  import Notifications from '@/views/components/dashboard/Notifications'
 
-export default {
-  name: "home",
-  components: {
-    HowToCite
+  export default {
+    data () {
+      return {
+        myLayers: [],
+        sharedLayers: []
+      }
+    },
+    mounted() {
+      this.updateLayers()
+      this.orderLayers(500)
+    },
+    computed: {
+      ...mapState('auth', ['isUserLoggedIn', 'user']),
+      ...mapState('map', ['boxNotifications']),
+    },
+    methods: {
+      deleteLayer(id) {
+        // Exibe um diálogo de confirmação nativo do navegador
+        const userConfirmed = window.confirm('Tem certeza que deseja excluir esta camada?');
+
+        // Verifica se o usuário confirmou
+        if (userConfirmed) {
+          // Se confirmado, faça a exclusão
+          Api().delete('/api/layer/' + id).then((response) => {
+            this.updateLayers();
+          });
+        }
+      },
+      editLayer(id){
+        this.$router.push({name: 'EditLayer', params: {layer_id: id}})
+      },
+      // handleClick(tab, event) {
+      //   console.log('\n handleClick: ');
+      //   console.log(' tab: ', tab);
+      //   console.log(' event: ', event);
+      // },
+      updateLayers(){
+        this.sharedLayers = []
+        this.myLayers = []
+
+        Api().get('/api/user_layer/?user_id='+this.user.user_id).then((response) => {
+          response.data.features.filter(e => {
+
+            Api().get('/api/layer/?layer_id=' + e.properties.layer_id).then((response2) => {
+              if (e.properties.is_the_creator)
+                this.myLayers.push(response2.data.features[0].properties)
+              else
+                this.sharedLayers.push(response2.data.features[0].properties)
+
+              this.orderLayers(10)
+
+              // save the layers inside the state
+              this.$store.dispatch('dashboard/setMyLayers', this.myLayers)
+              this.$store.dispatch('dashboard/setSharedLayers', this.sharedLayers)
+            })
+
+          })
+        })
+
+      },
+      orderLayers(x){
+        // const vm = this
+        setTimeout(_ => {
+          this.myLayers.sort((a, b) => {
+            if (a.name.toLowerCase() > b.name.toLowerCase())
+              return 1;
+
+            if (a.name.toLowerCase() < b.name.toLowerCase())
+              return -1;
+
+            // a must be equal to b
+            return 0;
+          })
+          this.sharedLayers.sort((a, b) => {
+            if (a.name.toLowerCase() > b.name.toLowerCase())
+              return 1;
+
+            if (a.name.toLowerCase() < b.name.toLowerCase())
+              return -1;
+
+            // a must be equal to b
+            return 0;
+          })
+        }, x);
+      }
+    },
+    components: {
+      "p-dash-layout": DashLayout,
+      'p-notifications': Notifications
+    }
   }
-}
 </script>
 
 <style lang="sass" scoped>
-  .background
-    background-color: #333333
+.add
+  top: 0px
+  display: inline-block
+  padding: 0px
+  margin: 0px
+  border: none
+  float: right
+  border-radius: 20px
 
-    .logo
-      position: absolute
-      display: flex
-      right: 300px
-      top: 100px
-
-    .text-style
-      padding: 100px
-      color: white
-      font-size: 16px
-
-      .column-style
-        padding-right: 80px
+.add2
+  top: 0px
+  float: right
+  display: inline-block
+  padding: 0px
+  margin-left: 10px
+  color: #ff6107
+  border-color: #ff6107
+  border-radius: 20px
 </style>
